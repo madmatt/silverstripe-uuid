@@ -1,106 +1,124 @@
-# SilverStripe supported module skeleton
+# silverstripe-uuid
 
-A useful skeleton to more easily create a [Silverstripe Module](https://docs.silverstripe.org/en/4/developer_guides/extending/modules/) that conform to the
-[Module Standard](https://docs.silverstripe.org/en/developer_guides/extending/modules/#module-standard).
+This module provides an easy system for generating, storing and retrieving `DataObject`s by UUID, instead of the auto-incrementing IDs provided in Silverstripe CMS by default.
 
-This readme contains descriptions of the parts of this module base you should customise to meet you own module needs.
-For example, the module name in the H1 above should be you own module name, and the description text you are reading now
-is where you should provide a good short explanation of what your module does.
+This module *does not* replace the auto-incrementing ID system, and this is still used as the standard primary key for all tables. It only adds a supplementary UUID as a secondary way of accessing an object. Therefore, it also does not provide the database-level benefits that using UUIDs can provide (e.g. the ability to asynchronously create unique IDs for objects in a multi-master replication setup).
 
-Where possible we have included default text that can be included as is into your module and indicated in 
-other places where you need to customise it
+The key reason for using this module is to ensure you don't leak information about your system to potential attackers. You should use UUIDs instead of auto-incrementing IDs in any public-facing context where you are referring to unique identifiers for an object.
 
-Below is a template of the sections of your readme.md you should ideally include to met the Module Standard 
-and help others make use of your modules.
-
-### Steps to prepare this module for your own use:
-
-- Clone this repository into a folder
-- Add your name/organisation to `LICENSE.md`
-- Update this readme with information about your module. Ensure sections that aren't relevant are deleted and 
-placeholders are edited where relevant
-- Review the README files in the various provided directories. You should replace these with `.gitkeep` or delete the 
-directories
-- Update the module's `composer.json` with your requirements and package name
-- Update (or remove) `package.json` with your requirements and package name. Run `yarn` (or remove `yarn.lock`) to 
-ensure dependencies resolve correctly
-- Clear the git history by running `rm -rf .git && git init`
-- Add and push to a VCS repository
-- Either [publish](https://getcomposer.org/doc/02-libraries.md#publishing-to-packagist) the module on packagist.org, or add a [custom repository](https://getcomposer.org/doc/02-libraries.md#publishing-to-a-vcs) to your main `composer.json`
-- Require the module in your main `composer.json`
-- Start developing your module!
+For example, a URL to view an individual member's profile might be `/members/view-profile/ae9d059a-88b7-4480-b9fa-07b63e480e9a` instead of `/members/view-profile/273`. This ensures that attackers can't easily guess other IDs by just adding or subtracting numbers, and more importantly ensures that nobody knows how many customers you have etc.
 
 ## Requirements
-
 * SilverStripe ^4.0
-* [Yarn](https://yarnpkg.com/lang/en/), [NodeJS](https://nodejs.org/en/) (6.x) and [npm](https://npmjs.com) (for building
-  frontend assets)
-* Other module
-* Other server requirement
-* Etc
 
 ## Installation
-Add some installation instructions here, having a 1 line composer copy and paste is useful. 
-Here is a composer command to create a new module project. Ensure you read the
-['publishing a module'](https://docs.silverstripe.org/en/developer_guides/extending/how_tos/publish_a_module/) guide
-and update your module's composer.json to designate your code as a SilverStripe module. 
-
 ```
-composer require silverstripe-module/skeleton 4.x-dev
+composer require madmatt/silverstripe-uuid
 ```
 
-**Note:** When you have completed your module, submit it to Packagist or add it as a VCS repository to your
-project's composer.json, pointing to the private repository URL.
+## Quick Usage
+There are two ways to use this module:
+* The simple but non-customisable way (adding the `UUIDExtension`)
+* The advanced, DIY way (using one or more `UUIDField`s.
 
-## License
-See [License](license.md)
+Which way you choose depends on how you want to use the module - in particular review the details below carefully to understand what each option means.
 
-We have included a 3-clause BSD license you can use as a default. We advocate for the BSD license as 
-it is one of the most permissive and open licenses.
+### Easy: Add the `UUIDExtension`
+The easiest way to use this module is to simply add the `UUIDExtension` to any `DataObject` that you want a UUID to be generated for:
 
-Feel free to alter the [license.md](license.md) to suit if you wan to use an alternative license.
-You can use [choosealicense.com](http://choosealicense.com) to help pick a suitable license for your project.
+**With YAML:**
+```yaml
+App\Model\MyDataObject:
+  extensions:
+    - 'Madmatt\UUID\UUIDExtension'
+```
 
-## Documentation
- * [Documentation readme](docs/en/readme.md)
+**With PHP:**
+```php
+<?php
+namespace App\Model;
 
-Add links into your docs/<language> folder here unless your module only requires minimal documentation 
-in that case, add here and remove the docs folder. You might use this as a quick table of content if you
-mhave multiple documentation pages.
+use SilverStripe\ORM\DataObject;
+use Madmatt\UUID\UUIDExtension;
 
-## Example configuration (optional)
-If your module makes use of the config API in SilverStripe it's a good idea to provide an example config
- here that will get the module working out of the box and expose the user to the possible configuration options.
+class MyDataObject extends DataObject
+{
+    private static $extensions = [
+        UUIDExtension::class
+    ];
+}
+```
 
-Provide a yaml code example where possible.
+Either of the above methods will create a new column on your `MyDataObject` table called 'UUID', and this will be automatically populated whenever the object is saved (including during the first `dev/build` after adding the extension - all existing records will have a UUID generated and stored). The UUID will only be written once, and must never change once it's created (e.g. if you attempt to edit it in code, you will get an `Exception` when writing the object).
+
+### Harder: Add one or more `UUIDField` DB fields
+Alternatively, you can implement this yourself by creating your own database field of type `Madmatt\UUID\UUIDField`, for example:
+
+```php
+<?php
+namespace App\Model;
+
+use SilverStripe\ORM\DataObject;
+use Madmatt\UUID\UUIDField;
+
+class MyDataObject extends DataObject
+{
+    private static $db = [
+        'MyCustomUUID' => UUIDField::class
+    ];
+}
+```
+
+If you use this method, you will need to take care of generating the UUIDs yourself (e.g. implement your own `onBeforeWrite()` method etc). The module will not ensure that the UUID never changes, so beware about using this as a primary key if you use this method.
+
+## Customisation
+By default, this module will generate random UUIDs (using [UUIDv4](https://uuid.ramsey.dev/en/latest/rfc4122/version4.html)), and this is recommended unless you specifically want to encode details such as the date/time that the UUID was generated or the machine that generated it.
+
+You can change this globally (however existing UUIDs that have already been generated will not be re-generated, and changing after some UUIDs are already generated has not been tested).
 
 ```yaml
-
-Page:
-  config_option: true
-  another_config:
-    - item1
-    - item2
-  
+---
+Name: uuid-override
+After: '#uuid-base-config'
+---
+Madmatt\UUID\UUIDField:
+  uuid_version: uuidv1
 ```
 
+We don't officially support the 'non-standard UUIDs' such as ordered-time UUIDs and Microsoft's similarly-named GUID format, but if you want to add support for them please feel free to make a pull request. These are supported by the underlying `ramsey/uuid` library, so it's just a case of wiring them up.
+
+You can define the style of UUID you want to use from the following list:
+- `uuidv1`: Time-based
+- `uuidv4`: Random
+
+Note that custom input into the UUID generation process (e.g. custom node value or clock sequence for UUIDv1) is not supported.
+
+This means that the following aren't supported:
+- `uuidv2`: DCE Security (requires a specified 'domain' value)
+- `uuidv3`: Name-based (MD5) (requires a namespace type and value)
+- `uuidv5`: Name-based (SHA-1) (requires a namespace type and value)
+
+Pull requests are welcome to help resolve this if you need V2, V3 or V5 UUIDs for your purposes.
+
+## License
+See [License](LICENSE.md)
+
 ## Maintainers
- * Person here <person@emailaddress.com>
- * Another maintainer <maintain@emailaddress.com>
- 
+ * [madmatt](https://github.com/madmatt)
+
 ## Bugtracker
-Bugs are tracked in the issues section of this repository. Before submitting an issue please read over 
-existing issues to ensure yours is unique. 
- 
+Bugs are tracked in the issues section of this repository. Before submitting an issue please read over
+existing issues to ensure yours is unique.
+
 If the issue does look like a new bug:
- 
+
  - Create a new issue
- - Describe the steps required to reproduce your issue, and the expected outcome. Unit tests, screenshots 
+ - Describe the steps required to reproduce your issue, and the expected outcome. Unit tests, screenshots
  and screencasts can help here.
- - Describe your environment as detailed as possible: SilverStripe version, Browser, PHP version, 
+ - Describe your environment as detailed as possible: SilverStripe version, Browser, PHP version,
  Operating System, any installed SilverStripe modules.
- 
-Please report security issues to the module maintainers directly. Please don't file security issues in the bugtracker.
- 
+
+Please report security issues to the module maintainers directly by emailing signups+uuidsecurity [at] madman.dev. Please don't file security issues in the bugtracker.
+
 ## Development and contribution
-If you would like to make contributions to the module please ensure you raise a pull request and discuss with the module maintainers.
+If you would like to make contributions to the module please raise a pull request. If you'd like to help but aren't sure how, please feel free to open an issue - we'd love to help you!

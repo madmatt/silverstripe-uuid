@@ -1,0 +1,6 @@
+---
+Name: uuid-base-config
+---
+# By default, we generate uuidv4 (random) UUIDs
+Madmatt\UUID\UUIDField:
+  uuid_version: uuidv4
