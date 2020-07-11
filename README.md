@@ -56,7 +56,9 @@ You can then use this in the same way that you use any other DB field, for examp
 ```php
 namespace App\Model;
 
-use SilverStripe\Control\Controller;use SilverStripe\ORM\DataObject;
+use SilverStripe\Control\Controller;
+use SilverStripe\ORM\DataObject;
+
 class MyDataObject extends DataObject
 {
     public function Link()
