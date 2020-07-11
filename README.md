@@ -51,6 +51,22 @@ class MyDataObject extends DataObject
 
 Either of the above methods will create a new column on your `MyDataObject` table called 'UUID', and this will be automatically populated whenever the object is saved (including during the first `dev/build` after adding the extension - all existing records will have a UUID generated and stored). The UUID will only be written once, and must never change once it's created (e.g. if you attempt to edit it in code, you will get an `Exception` when writing the object).
 
+You can then use this in the same way that you use any other DB field, for example:
+
+```php
+namespace App\Model;
+
+use SilverStripe\Control\Controller;use SilverStripe\ORM\DataObject;
+class MyDataObject extends DataObject
+{
+    public function Link()
+    {
+        // Returns: /members/view-profile/ae9d059a-88b7-4480-b9fa-07b63e480e9a
+        return Controller::join_links('members', 'view-profile', $this->UUID);
+    }
+}
+```
+
 ### Harder: Add one or more `UUIDField` DB fields
 Alternatively, you can implement this yourself by creating your own database field of type `Madmatt\UUID\UUIDField`, for example:
 
