@@ -1,3 +1,7 @@
+# Archived repository
+> [!CAUTION]
+> This repository is archived, please consider using [lekoala/silverstripe-uuid](https://github.com/lekoala/silverstripe-uuid) instead.
+
 # silverstripe-uuid
 
 This module provides an easy system for generating, storing and retrieving `DataObject`s by UUID, instead of the auto-incrementing IDs provided in Silverstripe CMS by default.
